@@ -89,7 +89,7 @@ void setup()
 
 void loop() 
 {
-  // Version v2.7 - 09/05/2026
+  // Version v3.0 - 21/07/2026
   // LoRa BitRate: 5468.75 bps
   // Telemetria RAW Recibida 530,1014.66,1014.56,0.81,22.15
   // Packet Number: 530
