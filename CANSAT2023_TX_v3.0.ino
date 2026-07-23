@@ -1,16 +1,19 @@
 /*
-  Versión CANSAT ARGENTINA 2026 con Diagnóstico Completo y MicroSD
-  Basado en la v2.7 de LU6APA y LU4BA
+  Versión CANSAT ARGENTINA 2026 con Diagnóstico, MicroSD y Giroscopio (MPU6050)
+  Basado en la v3.0
 */
 #include <Wire.h>
 #include <SPI.h>
 #include <LoRa.h>
 #include <Adafruit_BMP085.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <SD.h>
 
 Adafruit_BMP085 bmp;
+Adafruit_MPU6050 mpu;
 
-char Version[] = "v3.0 - 2026";
+char Version[] = "v3.1 - 2026";
 
 // Pines LoRa
 #define CS    18      
@@ -19,7 +22,7 @@ char Version[] = "v3.0 - 2026";
 #define LED   25      
 
 // Pin de Chip Select para la MicroSD
-#define SD_CS 13      // <--- GPIO 13 para la SD
+#define SD_CS 13      
 
 #define SERIAL_BAUDRATE   115200    
 #define INTERVAL_TIME_TX  1000      
@@ -38,6 +41,7 @@ char Version[] = "v3.0 - 2026";
 
 double baseline;
 double T, P, A;
+float gyroX, gyroY, gyroZ;
 unsigned int pktNumber = 0;
 double bitRate;
 bool sdDisponible = false;
@@ -80,12 +84,16 @@ void setup()
     File dataFile = SD.open("/telemetria.csv", FILE_APPEND);
     if (dataFile) {
       if (dataFile.size() == 0) {
-        dataFile.println("Packet,PresionBase_hPa,Presion_hPa,Altura_m,Temp_C");
+        // Se agregaron las columnas del giroscopio al encabezado
+        dataFile.println("Packet,PresionBase_hPa,Presion_hPa,Altura_m,Temp_C,GyroX_rads,GyroY_rads,GyroZ_rads");
       }
       dataFile.close();
     }
   }
   
+  // Iniciar bus I2C para ambos sensores (SDA=23, SCL=22)
+  Wire.begin(23, 22);
+
   // Inicialización del BMP180
   bool bmpIsInit = false;
   Serial.println("Iniciando BMP180...");
@@ -93,7 +101,6 @@ void setup()
   
   do {
         delay(1000);  
-        Wire.begin(23, 22);
         if (bmp.begin(BMP085_STANDARD))
         {
               Serial.println("BMP180 inicio OK");
@@ -103,26 +110,41 @@ void setup()
               Serial.print(baseline * 0.01);
               Serial.println(" hPa");
               bmpIsInit = true;
-              digitalWrite(LED, LOW); 
         } 
         else
         {
           Serial.println("Buscando sensor BMP180...");
         }     
       } while (!bmpIsInit);
+
+  // Inicialización del MPU6050
+  Serial.println("Iniciando MPU6050...");
+  if (!mpu.begin()) {
+    Serial.println("Error al iniciar MPU6050. Verifica conexiones!");
+  } else {
+    Serial.println("MPU6050 inicio OK");
+    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  }
+  
+  digitalWrite(LED, LOW); 
 }
 
 void loop()
 {
   readTempPressure();
+  readGyro();
   pktNumber++;  
 
-  // Armar trama idéntica a la versión original de la competencia
+  // Armar trama agregando las 3 variables nuevas del giroscopio
   String dataString = String(pktNumber) + "," + 
                       String(baseline * 0.01, 2) + "," + 
                       String(P * 0.01, 2) + "," + 
                       String(A, 2) + "," + 
-                      String(T, 1);
+                      String(T, 1) + "," +
+                      String(gyroX, 2) + "," +
+                      String(gyroY, 2) + "," +
+                      String(gyroZ, 2);
 
   // =========================================================================
   // IMPRESIÓN DETALLADA PARA CHEQUEO PRE-VUELO EN MONITOREO SERIAL
@@ -132,6 +154,9 @@ void loop()
   Serial.print("Temperatura: "); Serial.print(T, 1); Serial.println(" °C");
   Serial.print("Presion Absoluta: "); Serial.print(P * 0.01, 2); Serial.println(" hPa");
   Serial.print("Altura Relativa: "); Serial.print(A, 2); Serial.println(" m");
+  Serial.print("Giroscopio (rad/s): X="); Serial.print(gyroX, 2); 
+  Serial.print(" | Y="); Serial.print(gyroY, 2); 
+  Serial.print(" | Z="); Serial.println(gyroZ, 2);
   Serial.print("Trama enviada [RAW]: "); Serial.println(dataString);
 
   // 1. Enviar por LoRa
@@ -161,8 +186,18 @@ void readTempPressure()
   A = bmp.readAltitude(); 
 } 
 
-void guardarEnSD(String datos) {
+void readGyro()
+{
+  sensors_event_t a_event, g_event, temp_event;
+  mpu.getEvent(&a_event, &g_event, &temp_event);
+  
+  // Guardamos las velocidades angulares en radianes por segundo
+  gyroX = g_event.gyro.x;
+  gyroY = g_event.gyro.y;
+  gyroZ = g_event.gyro.z;
+}
 
+void guardarEnSD(String datos) {
   File dataFile = SD.open("/telemetria.csv", FILE_APPEND);
   
   if (dataFile) {
