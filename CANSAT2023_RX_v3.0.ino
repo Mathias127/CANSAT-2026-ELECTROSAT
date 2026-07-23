@@ -7,33 +7,29 @@
   27/05/2022 adecuaciones LU6APA.
   28/03/2023 adecuaciones LU6APA y LU4BA.
   09/05/2026 adecuaciones menores LU4BA.
+  Actualización v3.1: Recepción de datos giroscopio MPU6050
 *********/
 
 #include <SPI.h>
 #include <LoRa.h>
 
-char Version[] = "v3.0 - 2026";
+char Version[] = "v3.1 - 2026";
 
 //Defino los pines a ser usados por el modulo transceptor LoRa
 #define CS    18      // Pin de CS del módulo LoRa
 #define RST   14      // Pin de Reset del módulo LoRa
 #define IRQ   26      // Pin del IRQ del módulo LoRa
-#define LED   25     // Pin del LED onboard
+#define LED   25      // Pin del LED onboard
 
 #define SERIAL_BAUDRATE   115200    // Velocidad del Puerto Serie
 
-// Configuraciones del módulo LoRa. Tener en cuenta que esta configuración debe ser igual en el Rx!
-// 433E6 for Asia
-// 866E6 for Europe
-// 915E6 for North America 
-// 915E6 to 928E3 for Argentina
-#define LORA_FREQUENCY      927000000  // Frecuencia en Hz a la que se quiere transmitir.
-#define LORA_SYNC_WORD      0x7F       // Byte value to use as the sync word, defaults to 0x12
-#define LORA_POWER          17         // TX power in dB, defaults to 17. Supported values are 2 to 20 for PA_OUTPUT_PA_BOOST_PIN, and 0 to 14 for PA_OUTPUT_RFO_PIN.
-#define LORA_SPREAD_FACTOR  7          // Spreading factor, defaults to 7. Supported values are between 6 and 12 (En Argentina se puede utilizar entre 7 a 10)
-#define LORA_SIG_BANDWIDTH  125E3      // Signal bandwidth in Hz, defaults to 125E3. Supported values are 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, 250E3, and 500E3 
-#define LORA_CODING_RATE    5          // Denominator of the coding rate, defaults to 5. Supported values are between 5 and 8, these correspond to coding rates of 4/5 and 4/8. The coding rate numerator is fixed at 4.
-
+// Configuraciones del módulo LoRa.
+#define LORA_FREQUENCY      927000000  
+#define LORA_SYNC_WORD      0x7F       
+#define LORA_POWER          17         
+#define LORA_SPREAD_FACTOR  7          
+#define LORA_SIG_BANDWIDTH  125E3      
+#define LORA_CODING_RATE    5          
 
 #define SCK   5
 #define MISO  19
@@ -59,7 +55,7 @@ void setup()
   // Apaga el LED si se conecta al COM
   digitalWrite(LED, LOW);  
   
-  Serial.println("LoRa Receiver");
+  Serial.println("LoRa Receiver - Iniciando...");
   
   SPI.begin(SCK, MISO, MOSI, SS);
 
@@ -71,9 +67,6 @@ void setup()
     delay(500);
   }
 
-  // Change sync word (0xF3) to match the receiver
-  // The sync word assures you don't get LoRa messages from other LoRa transceivers
-  // ranges from 0-0xFF
   LoRa.setSyncWord(LORA_SYNC_WORD);
   LoRa.setTxPower(LORA_POWER);              
   LoRa.setSpreadingFactor(LORA_SPREAD_FACTOR);           
@@ -89,17 +82,6 @@ void setup()
 
 void loop() 
 {
-  // Version v3.0 - 21/07/2026
-  // LoRa BitRate: 5468.75 bps
-  // Telemetria RAW Recibida 530,1014.66,1014.56,0.81,22.15
-  // Packet Number: 530
-  // Presion Base: 1014.66
-  // Presion Absoluta: 1014.56
-  // Altura: 0.81
-  // Temperatura: 22.15
-  // Nivel de señal [RSSI]: -45
-  // =====================================================================
-  
   // Trato de parsear el paquete  
   int packetSize = LoRa.parsePacket();
   
@@ -121,7 +103,7 @@ void loop()
       Serial.print(bitRate);
       Serial.println(" bps");
             
-      Serial.print("Telemetria RAW Recibida ");
+      Serial.print("Telemetria RAW Recibida: ");
       Serial.println(LoRaData); 
         
       int indicador1 = LoRaData.indexOf(',');
@@ -148,6 +130,23 @@ void loop()
       String temperatura = LoRaData.substring(indicador4+1, indicador5);
       Serial.print("Temperatura: ");
       Serial.println(temperatura);    
+
+      // ----- NUEVA SECCIÓN: Parseo del Giroscopio -----
+      int indicador6 = LoRaData.indexOf(',', indicador5+1);
+      String gyroX = LoRaData.substring(indicador5+1, indicador6);
+      Serial.print("Gyro X (rad/s): ");
+      Serial.println(gyroX);
+
+      int indicador7 = LoRaData.indexOf(',', indicador6+1);
+      String gyroY = LoRaData.substring(indicador6+1, indicador7);
+      Serial.print("Gyro Y (rad/s): ");
+      Serial.println(gyroY);
+
+      int indicador8 = LoRaData.indexOf(',', indicador7+1);
+      String gyroZ = LoRaData.substring(indicador7+1, indicador8);
+      Serial.print("Gyro Z (rad/s): ");
+      Serial.println(gyroZ);
+      // ------------------------------------------------
     }
     
     // Nivel de señal RSSI del paquete
