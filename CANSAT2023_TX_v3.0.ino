@@ -1,19 +1,19 @@
 /*
   Versión CANSAT ARGENTINA 2026 con Diagnóstico, MicroSD y Giroscopio (MPU6050)
-  Basado en la v3.0
+  Basado en la v3.1
 */
 #include <Wire.h>
 #include <SPI.h>
 #include <LoRa.h>
-#include <Adafruit_BMP085.h>
+#include <Adafruit_BMP280.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <SD.h>
 
-Adafruit_BMP085 bmp;
+Adafruit_BMP280 bmp;
 Adafruit_MPU6050 mpu;
 
-char Version[] = "v3.1 - 2026";
+char Version[] = "v3.2 - 2026";
 
 // Pines LoRa
 #define CS    18      
@@ -94,16 +94,16 @@ void setup()
   // Iniciar bus I2C para ambos sensores (SDA=23, SCL=22)
   Wire.begin(23, 22);
 
-  // Inicialización del BMP180
+  // Inicialización del BMP280
   bool bmpIsInit = false;
-  Serial.println("Iniciando BMP180...");
+  Serial.println("Iniciando BMP280...");
   digitalWrite(LED, HIGH); 
   
   do {
         delay(1000);  
-        if (bmp.begin(BMP085_STANDARD))
+        if (bmp.begin(0x76))
         {
-              Serial.println("BMP180 inicio OK");
+              Serial.println("BMP280 inicio OK");
               readTempPressure();
               baseline = P;
               Serial.print("Presion Base: ");
@@ -113,7 +113,7 @@ void setup()
         } 
         else
         {
-          Serial.println("Buscando sensor BMP180...");
+          Serial.println("Buscando sensor BMP280...");
         }     
       } while (!bmpIsInit);
 
